@@ -39,7 +39,7 @@ pub enum Engine {
 	#[serde(rename="tendermint")]
 	Tendermint(Tendermint),
     /// TLEngine
-    #[serde(rename="tlengine")]
+    #[serde(rename="tlEngine")]
     TLEngine(TLEngine)
 }
 

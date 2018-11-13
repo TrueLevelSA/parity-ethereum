@@ -35,7 +35,9 @@ impl Into<Generic> for Ethereum {
 		Generic(s.out())
 	}
 }
-
+pub struct TLEngine {
+	pub signature: H520,
+}
 /// AuthorityRound seal.
 pub struct AuthorityRound {
 	/// Seal step.
@@ -73,6 +75,15 @@ impl Into<Generic> for Tendermint {
 	}
 }
 
+impl Into<Generic> for TLEngine {
+	fn into(self) -> Generic {
+		let mut stream = RlpStream::new_list(1);
+		stream
+			.append(&self.signature);
+		Generic(stream.out())
+	}
+}
+
 pub struct Generic(pub Vec<u8>);
 
 /// Genesis seal type.
@@ -83,6 +94,8 @@ pub enum Seal {
 	AuthorityRound(AuthorityRound),
 	/// Tendermint seal.
 	Tendermint(Tendermint),
+	/// TLEngine seal.
+	TLEngine(TLEngine),
 	/// Generic RLP seal.
 	Generic(Generic),
 }
@@ -103,6 +116,9 @@ impl From<ethjson::spec::Seal> for Seal {
 				proposal: tender.proposal.into(),
 				precommits: tender.precommits.into_iter().map(Into::into).collect()
 			}),
+			ethjson::spec::Seal::TLEngine(tl_engine) => Seal::TLEngine(TLEngine {
+				signature: tl_engine.signature.into(),
+			}),
 			ethjson::spec::Seal::Generic(g) => Seal::Generic(Generic(g.into())),
 		}
 	}
@@ -115,6 +131,7 @@ impl Into<Generic> for Seal {
 			Seal::Ethereum(eth) => eth.into(),
 			Seal::AuthorityRound(ar) => ar.into(),
 			Seal::Tendermint(tender) => tender.into(),
+			Seal::TLEngine(tl_engine) => tl_engine.into()
 		}
 	}
 }

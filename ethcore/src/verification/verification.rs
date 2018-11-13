@@ -162,8 +162,11 @@ fn verify_uncles(block: &PreverifiedBlock, bc: &BlockProvider, engine: &EthEngin
 		}
 
 		let mut excluded = HashSet::new();
+		// add current block header hash to excluded
 		excluded.insert(header.hash());
 		let mut hash = header.parent_hash().clone();
+
+		// add current parent block header to excluded
 		excluded.insert(hash.clone());
 		for _ in 0..engine.maximum_uncle_age() {
 			match bc.block_details(&hash) {
@@ -198,11 +201,9 @@ fn verify_uncles(block: &PreverifiedBlock, bc: &BlockProvider, engine: &EthEngin
 			//												(8 Invalid)
 
 			let depth = if header.number() > uncle.number() { header.number() - uncle.number() } else { 0 };
+
 			if depth > engine.maximum_uncle_age() as u64 {
 				return Err(From::from(BlockError::UncleTooOld(OutOfBounds { min: Some(header.number() - depth), max: Some(header.number() - 1), found: uncle.number() })));
-			}
-			else if depth < 1 {
-				return Err(From::from(BlockError::UncleIsBrother(OutOfBounds { min: Some(header.number() - depth), max: Some(header.number() - 1), found: uncle.number() })));
 			}
 
 			// cB
@@ -214,8 +215,12 @@ fn verify_uncles(block: &PreverifiedBlock, bc: &BlockProvider, engine: &EthEngin
 			// cB.p^6	-----------/  6
 			// cB.p^7	-------------/
 			// cB.p^8
+
+			// expected_uncle_parent gets mutated inside the for loop
 			let mut expected_uncle_parent = header.parent_hash().clone();
 			let uncle_parent = bc.block_header_data(&uncle.parent_hash()).ok_or_else(|| Error::from(BlockError::UnknownUncleParent(uncle.parent_hash().clone())))?;
+
+			// depth defined above as the difference of block number btw parent and uncle
 			for _ in 0..depth {
 				match bc.block_details(&expected_uncle_parent) {
 					Some(details) => {
@@ -224,14 +229,32 @@ fn verify_uncles(block: &PreverifiedBlock, bc: &BlockProvider, engine: &EthEngin
 					None => break
 				}
 			}
-			if expected_uncle_parent != uncle_parent.hash() {
-				return Err(From::from(BlockError::UncleParentNotInChain(uncle_parent.hash())));
-			}
+			// let is_nephew = |another_uncle: &Header| -> bool { uncle_parent.hash() == another_uncle.hash() };
 
-			let uncle_parent = uncle_parent.decode()?;
-			verify_parent(&uncle, &uncle_parent, engine)?;
-			engine.verify_block_family(&uncle, &uncle_parent)?;
-			verified.insert(uncle.hash());
+			if expected_uncle_parent != uncle_parent.hash() {
+				// lets assume what was an uncle is actually a child of an uncle, the nephew (A0)
+				let nephew = uncle;
+				let uncle_hash = uncle_parent.hash();
+				let uncles: Vec<_> = block.uncles.iter().filter(|uncle| uncle_hash == uncle.hash()).collect(); // should be empty or singleton
+
+				// test the nephew assumption above (A0): if the block we are analysing is indeed a nephew, its parent
+				// (the uncle) should be in the uncles, else return error
+				if  uncles.len() > 0 {
+					let uncle = uncles.iter().next().expect("tested above that it is non_empty");
+					verify_parent(&nephew, &uncle, engine)?;
+					engine.verify_block_family(&nephew, &uncle)?;
+					verified.insert(nephew.hash());
+					// go on without further verification as the for-loop will later throw if the direct uncle of the
+					// chain doesn't pass the test
+				} else {
+					return Err(From::from(BlockError::UncleParentNotInChain(uncle_parent.hash())));
+				}
+			} else {
+				let uncle_parent = uncle_parent.decode()?;
+				verify_parent(&uncle, &uncle_parent, engine)?;
+				engine.verify_block_family(&uncle, &uncle_parent)?;
+				verified.insert(uncle.hash());
+			}
 		}
 	}
 

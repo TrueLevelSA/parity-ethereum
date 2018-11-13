@@ -141,7 +141,7 @@ pub trait BlockProvider {
 	fn transaction(&self, address: &TransactionAddress) -> Option<LocalizedTransaction> {
 		self.block_body(&address.block_hash)
 			.and_then(|body| self.block_number(&address.block_hash)
-			.and_then(|n| body.view().localized_transaction_at(&address.block_hash, n, address.index)))
+	  	    .and_then(|n| body.view().localized_transaction_at(&address.block_hash, n, address.index)))
 	}
 
 	/// Get transaction receipt.
@@ -154,7 +154,7 @@ pub trait BlockProvider {
 	fn transactions(&self, hash: &H256) -> Option<Vec<LocalizedTransaction>> {
 		self.block_body(hash)
 			.and_then(|body| self.block_number(hash)
-			.map(|n| body.view().localized_transactions(hash, n)))
+      		.map(|n| body.view().localized_transactions(hash, n)))
 	}
 
 	/// Returns reference to genesis hash.
@@ -178,7 +178,7 @@ pub trait BlockProvider {
 
 	/// Returns logs matching given filter.
 	fn logs<F>(&self, blocks: Vec<H256>, matches: F, limit: Option<usize>) -> Vec<LocalizedLogEntry>
-		where F: Fn(&LogEntry) -> bool + Send + Sync, Self: Sized;
+	  where F: Fn(&LogEntry) -> bool + Send + Sync, Self: Sized;
 }
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
@@ -352,7 +352,7 @@ impl BlockProvider for BlockChain {
 	/// Returns logs matching given filter. The order of logs returned will be the same as the order of the blocks
 	/// provided. And it's the callers responsibility to sort blocks provided in advance.
 	fn logs<F>(&self, mut blocks: Vec<H256>, matches: F, limit: Option<usize>) -> Vec<LocalizedLogEntry>
-		where F: Fn(&LogEntry) -> bool + Send + Sync, Self: Sized {
+	  where F: Fn(&LogEntry) -> bool + Send + Sync, Self: Sized {
 		// sort in reverse order
 		blocks.reverse();
 
@@ -882,7 +882,7 @@ impl BlockChain {
 	/// Get a specific epoch transition by block number and provided block hash.
 	pub fn epoch_transition(&self, block_num: u64, block_hash: H256) -> Option<EpochTransition> {
 		trace!(target: "blockchain", "Loading epoch transition at block {}, {}",
-			block_num, block_hash);
+	    block_num, block_hash);
 
 		self.db.key_value().read(db::COL_EXTRA, &block_num).and_then(|transitions: EpochTransitions| {
 			transitions.candidates.into_iter().find(|c| c.block_hash == block_hash)
@@ -1179,29 +1179,41 @@ impl BlockChain {
 		if !self.is_known(parent) {
 			return None;
 		}
-
-		let mut excluded = HashSet::new();
-		let ancestry = self.ancestry_iter(parent.clone())?;
-
-		for a in ancestry.clone().take(uncle_generations) {
-			if let Some(uncles) = self.uncle_hashes(&a) {
+		// from older blocks into their children, and recurse on
+		fn inner (bc: &BlockChain, parent: &H256, uncle_generations: usize, mut excluded: HashSet<H256>, ret: Vec<H256>, blocking_descendants: &Vec<H256>) -> (HashSet<H256>, Vec<H256>)  {
+			if let Some(uncles) = bc.uncle_hashes(parent) {
 				excluded.extend(uncles);
-				excluded.insert(a);
-			} else {
-				break
+				excluded.insert(parent.clone());
 			}
-		}
-
-		let mut ret = Vec::new();
-		for a in ancestry.skip(1).take(uncle_generations) {
-			if let Some(details) = self.block_details(&a) {
-				ret.extend(details.children.iter().filter(|h| !excluded.contains(h)))
-			} else {
-				break
+			match bc.block_details(parent) {
+				Some(ref details) if uncle_generations > 0 => {
+					details.children.iter()
+						.filter(|child| !blocking_descendants.contains(&child))
+						.fold((excluded.clone(), ret), |(mut acc_excluded, mut acc_ret), &child| {
+							if let Some(uncles) = bc.uncle_hashes(&child) {
+								acc_excluded.extend(uncles.clone());
+							}
+							if !acc_excluded.contains(&child) {
+								acc_excluded.insert(child.clone());
+								acc_ret.push(child);
+							}
+							inner(bc, &child, uncle_generations - 1, acc_excluded, acc_ret, blocking_descendants)
+						})
+				},
+				_ => (excluded, ret),
 			}
-		}
+		};
 
-		Some(ret)
+		// from newest blocks into oldest
+		let blocking_descendants = self.block_details(parent).map(|details| details.children).unwrap_or(Vec::new());
+		let excluded = HashSet::new();
+		let ret = Vec::new();
+		self.ancestry_iter(parent.clone())
+			.map(|ancestors| ancestors.take(uncle_generations + 1)
+				 .fold((excluded, ret), |(acc_excluded, acc_ret), a| {
+					 inner(self, &a, uncle_generations, acc_excluded, acc_ret, &blocking_descendants)
+				 }))
+			.map(|(_, ret)| ret)
 	}
 
 	/// This function returns modified block hashes.
@@ -1250,7 +1262,6 @@ impl BlockChain {
 		block_details.insert(info.hash, details);
 		block_details
 	}
-
 	/// This function returns modified block receipts.
 	fn prepare_block_receipts_update(&self, receipts: Vec<Receipt>, info: &BlockInfo) -> HashMap<H256, BlockReceipts> {
 		let mut block_receipts = HashMap::new();
@@ -1614,16 +1625,33 @@ mod tests {
 		let b3b = b2a.add_block_with_difficulty(9);
 		let b4b = b3a.add_block_with_difficulty(9);
 		let b5b = b4a.add_block_with_difficulty(9);
+		let b5c = b4b.add_block_with_difficulty(10);
 
-		let uncle_headers = vec![
-			b4b.last().header().encoded(),
-			b3b.last().header().encoded(),
-			b2b.last().header().encoded(),
-		];
+		use std::collections::HashMap;
+		let block_hashes: HashMap<_,_> = [
+			(b1a.last().header().hash(),  "b1a"),
+			(b2a.last().header().hash(),  "b2a"),
+			(b3a.last().header().hash(),  "b3a"),
+			(b4a.last().header().hash(),  "b4a"),
+			(b5a.last().header().hash(),  "b5a"),
+			(b1b.last().header().hash(),  "b1b"),
+			(b2b.last().header().hash(),  "b2b"),
+			(b3b.last().header().hash(),  "b3b"),
+			(b4b.last().header().hash(),  "b4b"),
+			(b5c.last().header().hash(),  "b5c"),
+			(b5b.last().header().hash(),  "b5b"),
+		].iter().cloned().collect();
+
+		let uncle_hashes = vec![
+			b4b.last().header().hash(),
+			b5c.last().header().hash(),
+			b3b.last().header().hash(),
+			b2b.last().header().hash(),
+		].iter().map(|b| block_hashes.get(b).cloned().unwrap()).collect::<Vec<_>>();
 		let b4a_hash = b4a.last().hash();
 
 		let generator = BlockGenerator::new(
-			vec![b1a, b1b, b2a, b2b, b3a, b3b, b4a, b4b, b5a, b5b]
+			vec![b1a, b1b, b2a, b2b, b3a, b3b, b4a, b4b, b5a, b5b, b5c]
 		);
 
 		let db = new_db();
@@ -1633,7 +1661,14 @@ mod tests {
 			insert_block(&db, &bc, b.encoded(), vec![]);
 		}
 
-		assert_eq!(uncle_headers, bc.find_uncle_headers(&b4a_hash, 3).unwrap());
+		assert_eq!(
+			uncle_hashes,
+			bc.find_uncle_headers(&b4a_hash, 3).unwrap()
+				.iter()
+				.map(|header| header.hash())
+				.map(|b| block_hashes.get(&b).cloned().unwrap())
+				.collect::<Vec<_>>()
+		);
 		// TODO: insert block that already includes one of them as an uncle to check it's not allowed.
 	}
 

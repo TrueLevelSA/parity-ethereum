@@ -69,7 +69,7 @@ keccak-hasher = { path = "../util/keccak-hasher" }
 kvdb-rocksdb = { git = "https://github.com/paritytech/parity-common" }
 tempdir = {version="0.3", optional = true}
 
-casper = { git = "ssh://git@gitlab.com/TrueLevel/casper/core-cbc.git", branch = "master" }
+casper = { git = "https://github.com/TrueLevelSA/cbc-casper-msg.git", branch = "master" }
 [target.'cfg(any(target_os = "linux", target_os = "macos", target_os = "windows", target_os = "android"))'.dependencies]
 hardware-wallet = { path = "../hw" }
 

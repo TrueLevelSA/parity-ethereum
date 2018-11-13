@@ -587,7 +587,7 @@ impl Spec {
 			ethjson::spec::Engine::Tendermint(tendermint) => Tendermint::new(tendermint.params.into(), machine)
 				.expect("Failed to start the Tendermint consensus engine."),
 			ethjson::spec::Engine::TLEngine(tl_engine) => TLEngine::new(tl_engine.params.into(), machine)
-				.expect("Failed to start AuthorityRound consensus engine."),
+				.expect("Failed to start TLEngine consensus engine."),
 		}
 	}
 

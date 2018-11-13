@@ -29,7 +29,7 @@ pub struct TLEngineValidatorWeight {
 /// Authority params deserialization.
 #[derive(Debug, PartialEq, Deserialize)]
 pub struct TLEngineParams {
-	pub value: Option<Uint>,
+	pub fault_tolerance_thr: Option<f64>,
 	pub validators: Vec<TLEngineValidatorWeight>,
 }
 
@@ -52,7 +52,7 @@ mod tests {
 	fn tl_params_deserialization() {
 		let s = r#"{
 			"params": {
-				"value": 1,
+				"fault_tolerance_thr": 10.0,
 				"validators": [
 					{ "address": "0xc6d9d2cd449a754c494264e1809c50e34d64562b", "weight": 1.2 },
 					{ "address": "0xd6d9d2cd449a754c494264e1809c50e34d64562b", "weight": 0.2 }
@@ -61,7 +61,7 @@ mod tests {
 		}"#;
 
 		let deserialized: TLEngine = serde_json::from_str(s).unwrap();
-		assert_eq!(deserialized.params.value, Some(Uint(1.into())));
+		assert_eq!(deserialized.params.fault_tolerance_thr, Some(10.0.into()));
 
 		let len = deserialized.params.validators.len();
 		assert_eq!(len, 2);

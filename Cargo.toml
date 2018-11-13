@@ -67,7 +67,7 @@ kvdb-rocksdb = { git = "https://github.com/paritytech/parity-common" }
 journaldb = { path = "util/journaldb" }
 mem = { path = "util/mem" }
 
-casper = { git = "ssh://git@gitlab.com/TrueLevel/casper/core-cbc.git", branch = "master" }
+casper = { git = "https://github.com/TrueLevelSA/cbc-casper-msg.git", branch = "master" }
 ethcore-secretstore = { path = "secret_store", optional = true }
 
 registrar = { path = "registrar" }

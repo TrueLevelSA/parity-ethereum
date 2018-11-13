@@ -39,6 +39,13 @@ pub struct AuthorityRoundSeal {
 	pub signature: H520,
 }
 
+
+#[derive(Debug, PartialEq, Deserialize)]
+pub struct TLEngineSeal {
+	/// Seal signature.
+	pub signature: H520,
+}
+
 /// Tendermint seal.
 #[derive(Debug, PartialEq, Deserialize)]
 pub struct TendermintSeal {
@@ -59,6 +66,8 @@ pub enum Seal {
 	/// AuthorityRound seal.
 	#[serde(rename="authorityRound")]
 	AuthorityRound(AuthorityRoundSeal),
+	#[serde(rename="tlEngine")]
+	TLEngine(TLEngineSeal),
 	/// Tendermint seal.
 	#[serde(rename="tendermint")]
 	Tendermint(TendermintSeal),
