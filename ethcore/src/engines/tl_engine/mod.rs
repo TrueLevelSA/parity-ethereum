@@ -483,38 +483,18 @@ impl Engine<EthereumMachine> for TLEngine {
 			).into())
 		}
 
-		// // let header = block.header();
-		// // FIXME: author shouldnt be used for casper msg, as it can differ from the signer
-		// // (block reward on a different address then the validating address)
-		// let author = header.author();
-		// let hash = header.hash();
+		// Check if the signature belongs to a validator, can depend on parent state.
+		let author = header.author();
+		let seal = &header.seal();
+		let header_signature = seal.get(0).ok_or(BlockError::InvalidSeal)?;
+		let sig = Rlp::new(header_signature).as_val::<H520>()?;
+		let signer = ethkey::public_to_address(&ethkey::recover(&sig.into(), &header.bare_hash())?);
+		// println!("author: {:?}", author);
+		// println!("signer: {:?}", signer);
 
-		// // let senders = (*self.sender_state.read()).get_senders_weights().get_senders().unwrap();
-		// // println!("senders: {:?}", senders);
-
-		// let casper_address = CasperAddress{ inner: author.clone() };
-
-		// use rlp::Rlp;
-
-		// // println!("seal: {:?}", header.seal());
-
-		// // TODO pZ4: turn on sig verification
-		// // Check if the signature belongs to a validator, can depend on parent state.
-
-		// // FIXME: seal for genesis not correct
-		// if header.parent_hash() != &H256::from(0) || header.hash() != H256::from(0) {
-		// 	let author = header.author();
-		// 	let seal = &header.seal();
-		// 	let header_signature = seal.get(0).ok_or(BlockError::InvalidSeal)?;
-		// 	let sig = Rlp::new(header_signature).as_val::<H520>()?;
-		// 	let signer = ethkey::public_to_address(&ethkey::recover(&sig.into(), &header.hash())?);
-		// 	println!("author: {:?}", author);
-		// 	println!("signer: {:?}", signer);
-
-		// 	if *author != signer {
-		// 		return Err(EngineError::NotAuthorized(*author).into())
-		// 	}
-		// }
+		if *author != signer {
+			return Err(EngineError::NotAuthorized(*author).into())
+		}
 
 		// if !senders.iter().any(|sender| sender.inner == signer) {
 		// 	return Err(EngineError::NotAuthorized(*author).into());
