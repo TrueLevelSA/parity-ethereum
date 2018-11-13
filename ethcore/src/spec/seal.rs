@@ -35,9 +35,12 @@ impl Into<Generic> for Ethereum {
 		Generic(s.out())
 	}
 }
+
+/// TL seal.
 pub struct TLEngine {
 	pub signature: H520,
 }
+
 /// AuthorityRound seal.
 pub struct AuthorityRound {
 	/// Seal step.

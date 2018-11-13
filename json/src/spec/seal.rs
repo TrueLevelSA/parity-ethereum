@@ -39,7 +39,6 @@ pub struct AuthorityRoundSeal {
 	pub signature: H520,
 }
 
-
 #[derive(Debug, PartialEq, Deserialize)]
 pub struct TLEngineSeal {
 	/// Seal signature.

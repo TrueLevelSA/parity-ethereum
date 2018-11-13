@@ -45,7 +45,6 @@ use ids::{BlockId, UncleId};
 use parking_lot::{RwLock};
 use unexpected::{Mismatch, OutOfBounds};
 
-
 use casper::message::{CasperMsg, Message};
 use casper::justification::{Justification, LatestMsgsHonest, SenderState, LatestMsgs};
 use casper::senders_weight::SendersWeight;
@@ -71,6 +70,7 @@ type BlockMsg = Message<CasperBlock, CasperAddress>;
 
 impl Data for CasperBlock {
     type Data = Self;
+
     fn is_valid(_data: &Self::Data) -> bool {
         true // FIXME
     }
@@ -81,6 +81,7 @@ impl From<ProtoBlock> for CasperBlock {
         CasperBlock(Box::new(Arc::new(protoblock)))
     }
 }
+
 impl<'z> From<&'z BlockMsg> for CasperBlock {
     fn from(msg: &BlockMsg) -> Self {
         msg.get_estimate().clone()
@@ -88,6 +89,7 @@ impl<'z> From<&'z BlockMsg> for CasperBlock {
 }
 
 impl CasperBlock {
+
     pub fn new(
         prev_block: Option<CasperBlock>,
         address: CasperAddress,
@@ -97,9 +99,11 @@ impl CasperBlock {
             address,
         })
     }
+
     pub fn get_sender(&self) -> CasperAddress {
         self.0.address.clone()
     }
+
     pub fn from_prevblock_msg(
         prevblock_msg: Option<BlockMsg>,
         // a incomplete_block is a block with a None prev_block (ie, Estimate) AND is
@@ -118,6 +122,7 @@ impl CasperBlock {
             Err("CasperBlock not valid")
         }
     }
+
     pub fn is_member(&self, rhs: &Self) -> bool {
         self == rhs
             || rhs
@@ -137,10 +142,12 @@ impl CasperBlock {
     pub fn get_prevblock(&self) -> Option<Self> {
         self.0.prev_block.as_ref().cloned()
     }
+
     pub fn parse_blockchains(
         latest_msgs: &LatestMsgsHonest<BlockMsg>,
         finalized_msg: Option<&BlockMsg>,
     ) -> (HashMap<CasperBlock, HashSet<CasperBlock>>, HashSet<CasperBlock>) {
+
         let mut visited: HashMap<CasperBlock, HashSet<CasperBlock>> = latest_msgs
             .iter()
             .map(|msg| {
@@ -149,8 +156,10 @@ impl CasperBlock {
                 (parent, children)
             })
             .collect();
+
         let mut queue: VecDeque<CasperBlock> = visited.keys().cloned().collect();
         let mut genesis: HashSet<CasperBlock> = HashSet::new();
+
         while let Some(child) = queue.pop_front() {
             match child.get_prevblock() {
                 Some(parent) => {
@@ -181,16 +190,21 @@ impl CasperBlock {
         visited: &HashMap<CasperBlock, HashSet<CasperBlock>>,
         weights: &SendersWeight<CasperAddress>,
     ) -> Option<(Option<Self>, WeightUnit, HashSet<Self>)> {
+
         let init = Some((None, WeightUnit::ZERO, HashSet::new()));
+
         let heaviest_child = blocks.iter().fold(init, |best, block| {
             best.and_then(|best| {
                 visited.get(&block).map(|children| (best, children))
             }).map(|((b_block, b_weight, b_children), children)| {
+
                 let mut referred_senders: HashSet<_> =
                     children.iter().map(Self::get_sender).collect();
                 // add current block sender such that its weight counts too
                 referred_senders.insert(block.get_sender());
+
                 let weight = weights.sum_weight_senders(&referred_senders);
+
                 // TODO: break ties with blockhash
                 if weight > b_weight {
                     (Some(block.clone()), weight, children.clone())
@@ -199,6 +213,7 @@ impl CasperBlock {
                 }
             })
         });
+
         heaviest_child.and_then(|(b_block, b_weight, b_children)| {
             if b_children.is_empty() {
                 // base case
@@ -215,8 +230,10 @@ impl CasperBlock {
         finalized_msg: Option<&BlockMsg>,
         senders_weights: &SendersWeight<<BlockMsg as CasperMsg>::Sender>,
     ) -> Option<Self> {
+
         let (visited, genesis) =
             Self::parse_blockchains(latest_msgs, finalized_msg);
+
         Self::pick_heaviest(&genesis, &visited, senders_weights)
             .and_then(|(opt_block, ..)| opt_block)
     }
@@ -260,12 +277,14 @@ impl Estimate for CasperBlock {
 }
 
 impl From<ethjson::spec::TLEngineParams> for TLEngineParams {
+
 	fn from(p: ethjson::spec::TLEngineParams) -> Self {
 		let validators: HashMap<CasperAddress, f64> =
 			p.validators.iter().fold(HashMap::new(), |mut validators, validator| {
 				validators.insert(CasperAddress{ inner: validator.address }, validator.weight);
 				validators
 			});
+
 		let senders_weights = SendersWeight::new(validators);
 		TLEngineParams {
 			thr: p.fault_tolerance_thr
@@ -309,9 +328,11 @@ impl CasperSender for CasperAddress { }
 
 
 impl TLEngine {
+
 	/// Create a new instance of TLEngine engine.
 	pub fn new(params: TLEngineParams, machine: EthereumMachine) -> Result<Arc<Self>, Error> {
 		let TLEngineParams{ senders_weights, thr } = params;
+
 		let engine = Arc::new(
 			TLEngine {
 				client: Arc::new(RwLock::new(None)),
@@ -334,6 +355,7 @@ impl TLEngine {
 
 	fn mk_casper_msg(&self, header: &Header) {
 		let parent_block = self.block_msgs.read().get(header.parent_hash()).map(CasperBlock::from);
+
 		match parent_block {
 			None => {
 				if header.parent_hash() == &H256::from(0) {
@@ -367,6 +389,7 @@ impl TLEngine {
 				let casper_address = CasperAddress{ inner: author.clone() };
 				let casper_block = CasperBlock::new(Some(parent_block), casper_address.clone());
 				let block_id = BlockId::Hash(header.hash());
+
 				let uncles: Vec<_> = self.client.read().as_ref()
 					.and_then(Weak::upgrade)
 					.and_then(|c| {
@@ -380,18 +403,23 @@ impl TLEngine {
 								.collect()
 						)})
 					.expect("full client must be available");
+
 				println!("uncles: {:?}", uncles);
+
 				let mut msgs_for_justification: Vec<_> = uncles.iter().map(|uncle| {
 					self.block_msgs.read().get(&uncle).cloned()
 						.expect("uncle should be in otherwise block wouldn't verify")
 				}).collect();
+
 				self.block_msgs.read()
 					.get(&header.parent_hash()).cloned()
 					.map(|parent| msgs_for_justification.push(parent));
+
 				let (justification, mut new) = Justification::from_msgs(
 					msgs_for_justification,
 					&self.sender_state.read()
 				);
+
 				let msg = BlockMsg::new(casper_address, justification, casper_block);
 
 				// inject the newly converted msg to the latest_msgs, as that will be used for the forkchoice rule
@@ -427,6 +455,7 @@ impl Engine<EthereumMachine> for TLEngine {
 			self.sender_state.read().get_latest_msgs(),
 			self.sender_state.read().get_equivocators(),
 		);
+
 		let best_block = CasperBlock::ghost(
 			&latest_honest_msgs,
 			None,
@@ -445,9 +474,11 @@ impl Engine<EthereumMachine> for TLEngine {
 		// println!("\nnew_block {:?}", new_block);
 		// println!("\ncurrent_block {:?}", current_block);
 
-		if best_block == new_block { super::ForkChoice::New }
-		else if best_block == current_block { super::ForkChoice::Old }
-		else {
+		if best_block == new_block { 
+            super::ForkChoice::New
+        } else if best_block == current_block {
+            super::ForkChoice::Old
+        } else {
 			panic!(
 				"Block picked on forkchoice rule not available in fork_choice fun \n best: {:?} \n new: {:?} \n current: {:?} \n ",
 				best_block,
@@ -476,6 +507,7 @@ impl Engine<EthereumMachine> for TLEngine {
 		// println!("verify_block_basic");
 		let found_seal_len = header.seal().len();
 		let expected_seal_len = self.seal_fields(header);
+
 		if found_seal_len != expected_seal_len {
 			return Err(BlockError::InvalidSealArity(
 				Mismatch { expected: expected_seal_len, found: found_seal_len}
@@ -492,7 +524,11 @@ impl Engine<EthereumMachine> for TLEngine {
 		// println!("signer: {:?}", signer);
 
 		if author != &signer
-			|| !(*self.sender_state.read()).get_senders_weights().get_senders().map(|senders| senders.iter().any(|sender| sender.inner == signer)).expect("Could not get senders (validators)")
+			|| !(*self.sender_state.read())
+                .get_senders_weights()
+                .get_senders()
+                .map(|senders| senders.iter().any(|sender| sender.inner == signer))
+                .expect("Could not get senders (validators)")
 		{
 			Err(EngineError::NotAuthorized(*author).into())
 		} else {
@@ -526,7 +562,6 @@ impl Engine<EthereumMachine> for TLEngine {
 				println!("Failed to sign in generate_seal!, {:?}", e);
 				Seal::None
 			})
-
 	}
 
 	fn open_block_header_timestamp(&self, parent_timestamp: u64) -> u64 {

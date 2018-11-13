@@ -19,7 +19,6 @@
 use uint::Uint;
 use ethereum_types::Address;
 
-
 #[derive(Debug, PartialEq, Deserialize)]
 pub struct TLEngineValidatorWeight {
 	pub address: Address,
