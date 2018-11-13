@@ -87,7 +87,6 @@ impl<'z> From<&'z BlockMsg> for CasperBlock {
     }
 }
 
-
 impl CasperBlock {
     pub fn new(
         prev_block: Option<CasperBlock>,
@@ -492,20 +491,19 @@ impl Engine<EthereumMachine> for TLEngine {
 		// println!("author: {:?}", author);
 		// println!("signer: {:?}", signer);
 
-		if *author != signer {
-			return Err(EngineError::NotAuthorized(*author).into())
+		if author != &signer
+			|| !(*self.sender_state.read()).get_senders_weights().get_senders().map(|senders| senders.iter().any(|sender| sender.inner == signer)).expect("Could not get senders (validators)")
+		{
+			Err(EngineError::NotAuthorized(*author).into())
+		} else {
+			Ok(())
 		}
 
-		// if !senders.iter().any(|sender| sender.inner == signer) {
-		// 	return Err(EngineError::NotAuthorized(*author).into());
-		// }
-
-		Ok(())
 	}
 
 	fn on_new_block(
 		&self,
-		block: &mut <EthereumMachine as ::parity_machine::Machine>::LiveBlock,
+		_block: &mut <EthereumMachine as ::parity_machine::Machine>::LiveBlock,
 		_epoch_begin: bool,
 		_ancestry: &mut Iterator<Item=<EthereumMachine as ::parity_machine::Machine>::ExtendedHeader>,
 	) -> Result<(), <EthereumMachine as ::parity_machine::Machine>::Error> {
@@ -514,7 +512,7 @@ impl Engine<EthereumMachine> for TLEngine {
 	}
 
 	/// Block transformation functions, after the transactions.
-	fn on_close_block(&self, block: &mut <EthereumMachine as ::parity_machine::Machine>::LiveBlock) -> Result<(), <EthereumMachine as ::parity_machine::Machine>::Error> {
+	fn on_close_block(&self, _block: &mut <EthereumMachine as ::parity_machine::Machine>::LiveBlock) -> Result<(), <EthereumMachine as ::parity_machine::Machine>::Error> {
 		// println!("on_close_block");
 		// TODO: block reward, slashing, adding / removing validators from the set should be done here
 		Ok(())
