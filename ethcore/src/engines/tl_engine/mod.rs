@@ -106,7 +106,7 @@ impl CasperBlock {
 
     pub fn from_prevblock_msg(
         prevblock_msg: Option<BlockMsg>,
-        // a incomplete_block is a block with a None prev_block (ie, Estimate) AND is
+        // an incomplete_block is a block with a None prev_block (ie, Estimate) AND is
         // not a genesis_block
         incomplete_block: CasperBlock,
     ) -> Result<Self, &'static str> {
