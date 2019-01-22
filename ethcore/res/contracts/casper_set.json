@@ -1,0 +1,35 @@
+[
+    {
+      "inputs": [
+        {
+          "name": "_addr",
+          "type": "address[]"
+        },
+        {
+          "name": "_weight",
+          "type": "uint256[]"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "constant": true,
+      "inputs": [],
+      "name": "getValidators",
+      "outputs": [
+        {
+          "name": "_addr",
+          "type": "address[]"
+        },
+        {
+          "name": "_weight",
+          "type": "uint256[]"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    }
+]

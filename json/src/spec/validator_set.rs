@@ -32,6 +32,9 @@ pub enum ValidatorSet {
 	/// Address of a contract that indicates the list of authorities and enables reporting of theor misbehaviour using transactions.
 	#[serde(rename="contract")]
 	Contract(Address),
+	/// Address of a casper contract that indicates the list of authorities.
+	#[serde(rename="casper")]
+	Casper(Address),
 	/// A map of starting blocks for each validator set.
 	#[serde(rename="multi")]
 	Multi(BTreeMap<Uint, ValidatorSet>),

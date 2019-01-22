@@ -20,6 +20,7 @@
 mod test;
 mod simple_list;
 mod safe_contract;
+mod casper_contract;
 mod contract;
 mod multi;
 
@@ -37,6 +38,7 @@ pub use self::test::TestSet;
 pub use self::simple_list::SimpleList;
 use self::contract::ValidatorContract;
 use self::safe_contract::ValidatorSafeContract;
+use self::casper_contract::ValidatorCasperContract;
 use self::multi::Multi;
 use super::SystemCall;
 
@@ -46,6 +48,7 @@ pub fn new_validator_set(spec: ValidatorSpec) -> Box<ValidatorSet> {
 		ValidatorSpec::List(list) => Box::new(SimpleList::new(list.into_iter().map(Into::into).collect())),
 		ValidatorSpec::SafeContract(address) => Box::new(ValidatorSafeContract::new(address.into())),
 		ValidatorSpec::Contract(address) => Box::new(ValidatorContract::new(address.into())),
+		ValidatorSpec::Casper(address) => Box::new(ValidatorCasperContract::new(address.into())),
 		ValidatorSpec::Multi(sequence) => Box::new(
 			Multi::new(sequence.into_iter().map(|(block, set)| (block.into(), new_validator_set(set))).collect())
 		),
